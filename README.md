@@ -67,3 +67,73 @@ You can change the token and the URL as need. To sum up, the following table rep
 | `admin` token (role `USER` `ADMIN`) |            200 |           200 |            200 |
 | `shuaicj` token (role `USER`)       |            403 |           200 |            200 |
 | no token                            |            401 |           401 |            200 |
+
+改造项目为动态获取用户名密码：auth-center项目下
+~~~
+shuaicj.example.security.auth.SecurityConfig
+
+@Autowired
+private UserDetailServiceImpl userDetailService;
+
+@Autowired
+    public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
+//        auth.inMemoryAuthentication()
+//                .withUser("admin").password("admin").roles("ADMIN", "USER").and()
+//                .withUser("shuaicj").password("shuaicj").roles("USER");
+
+        auth.userDetailsService(userDetailService);
+    }
+~~~
+    
+增加类
+~~~
+package shuaicj.example.security.auth.service.impl;
+
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+import shuaicj.example.security.auth.enity.MyUser;
+
+import java.util.*;
+
+/**
+ * @Desc: 通过用户名获取用户进行用户名、密码认证
+ * @Author: YanQing
+ * @Date: 2019/5/23 10:27
+ * @Version 1.0
+ */
+@Service
+public class UserDetailServiceImpl implements UserDetailsService {
+
+    /**
+     * 可以从
+     * 1，数据库中获取
+     * 2，配置文件
+     * 3，远程服务器
+     * @param username
+     * @return
+     * @throws UsernameNotFoundException
+     */
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        Map<String, MyUser> userMap = new HashMap<>(2);
+        userMap.put("admin", new MyUser("admin", "admin", "ADMIN"));
+        userMap.put("shuaicj", new MyUser("shuaicj", "shuaicj", "USER"));
+        final MyUser myUser = userMap.get(username);
+        if (Objects.nonNull(myUser)) {
+            GrantedAuthority grantedAuthority = new SimpleGrantedAuthority("ROLE_" + myUser.getPermission());
+            List<GrantedAuthority> list = new ArrayList<>();
+            list.add(grantedAuthority);
+            return new User(myUser.getUsername(), myUser.getPassword(), list);
+        }
+
+        throw new AccessDeniedException("no right");
+    }
+}
+
+~~~
